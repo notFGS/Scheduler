@@ -1,0 +1,25 @@
+{
+  "short_name": "Scheduler (Beta)",
+  "name": "Scheduler App for WIS Students", 
+  "icons": [
+    {
+      "src": "scheduler.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "sch192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "sch512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}
