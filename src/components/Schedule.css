@@ -1,0 +1,130 @@
+/* Overall grid layout for the schedule */
+.schedule-grid {
+  display: grid;
+  grid-template-columns: 60px repeat(5, 1fr); /* 60px for time labels, 5 equal columns for days */
+  grid-template-rows: 40px repeat(48, 20px); /* 48 rows for 15-minute increments, each 20px high */
+  position: relative;
+  width: 760px;
+  height: 920px;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  z-index: 0;
+  margin-top: -20px;
+}
+
+/* Add background gridlines conforming to the day columns */
+.schedule-grid::before {
+  content: '';
+  position: absolute;
+  top: 40px; /* Start after the day headers */
+  left: 60px; /* Start after the time labels */
+  right: 0;
+  bottom: 0; /* Leave space for the last hour */
+  background-image:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.25) 1px, transparent 1px), /* Major horizontal lines */
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px), /* Minor horizontal lines */
+    linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px); /* Vertical lines */
+  background-size: calc(100% / 5) 80px, /* Major gridline every hour (80px) */
+                    calc(100% / 5) 40px, /* Minor gridline every half hour (40px) */
+                    calc(100% / 5) 100%; /* Vertical lines for day columns */
+  z-index: 0;
+}
+
+/* Separating time column */
+.schedule-grid .time-slot:nth-child(1n+1) {
+  border-right: 2px solid #1fa7d4; /* Major gridline in blue */
+}
+
+/* Separating each hour */
+.schedule-grid .time-slot {
+  border-top: 1px solid rgba(0, 0, 0, 0.1); /* Minor gridline */
+}
+
+/* Time labels on the left */
+.time-labels {
+  grid-column: 1 / 2;
+  grid-row: 2 / -1;
+  display: grid;
+  grid-template-rows: repeat(12, 80px); /* Show only full hours, every 4 rows */
+}
+
+.time-slot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 12px;
+  color: #555; /* Darker text color for better contrast */
+}
+
+/* Day headers */
+.day-headers {
+  grid-column: 2 / 7; /* 5 days (Sunday to Thursday) */
+  grid-row: 1 / 2; /* Day headers occupy the first row */
+  display: grid;
+  grid-template-columns: repeat(5, 1fr); /* 5 equal columns for days */
+}
+
+.day-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #1fa7d4; /* Blue background for headers */
+  color: white; /* White text */
+  font-weight: bold;
+  height: 40px;
+  font-size: 14px;
+  border-right: 1px solid rgba(0, 0, 0, 0.1); /* Border between day headers */
+}
+
+/* Course blocks */
+.course-blocks {
+  grid-column: 2 / 7;
+  grid-row: 2 / -1;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-auto-rows: 20px; /* Each 15-minute slot is 20px */
+}
+
+/* Each course block */
+.course-block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: top;
+  background-color: rgba(173, 216, 230, 0.95); /* Light blue background */
+  color: #fff;
+  font-weight: bold;
+  border-radius: 8px; /* Rounded corners */
+  padding: 0px; /* Padding inside course blocks */
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease, transform 0.3s ease; /* Smooth transition for hover */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+  text-align: center; /* Ensure text is centered within the block */
+  word-wrap: break-word; /* Ensure text wraps within the block */
+  overflow: hidden; /* Ensure text does not overflow outside the block */
+}
+
+.course-block:hover {
+  background-color: rgba(173, 216, 230, 1); /* Darker blue on hover */
+  transform: translateY(-2px); /* Slight lift effect on hover */
+}
+
+/* Ensuring text fits within the course block */
+.course-title {
+  font-size: clamp(12px, 1.5vw, 14px); /* Ensure the title scales dynamically */
+  font-size: clamp(12px, 1.5vh, 14px);
+  margin-bottom: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: unset; /* Remove line clamp */
+  line-clamp: unset; /* Remove line clamp */
+  -webkit-box-orient: vertical;
+  overflow: visible; /* Allow overflow */
+  text-overflow: unset; /* Remove text overflow ellipsis */
+}
+
+.course-time,
+.course-location {
+  font-size: clamp(10px, 1.2vw, 14px); /* Ensure the time and location scale dynamically */
+  font-size: clamp(12px, 1.5vh, 14px);
+  position: relative;
+}
