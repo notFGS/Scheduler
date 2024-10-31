@@ -38,32 +38,32 @@ const fixedTimeSlots = [
   '16:00', '17:00', '18:00', '19:00'
 ];
 
-// Function to group overlapping courses
-const groupOverlappingCourses = (courses) => {
+// Function to group overlapping timeslots
+const groupOverlappingTimeslots = (courses) => {
   const groups = [];
   courses.forEach(course => {
-    let added = false;
-    for (const group of groups) {
-      if (group.some(c => c.schedule.some(timeslot => 
-        course.schedule.some(ts => 
+    course.schedule.forEach(timeslot => {
+      let added = false;
+      for (const group of groups) {
+        if (group.some(ts => 
           ts.fromTime < timeslot.toTime && ts.toTime > timeslot.fromTime && ts.day === timeslot.day
-        )
-      ))) {
-        group.push(course);
-        added = true;
-        break;
+        )) {
+          group.push({ ...timeslot, course });
+          added = true;
+          break;
+        }
       }
-    }
-    if (!added) {
-      groups.push([course]);
-    }
+      if (!added) {
+        groups.push([{ ...timeslot, course }]);
+      }
+    });
   });
   return groups;
 };
 
 // Main Schedule component
-const Schedule = ({ pickedCourses }) => {
-  const groupedCourses = groupOverlappingCourses(pickedCourses);
+const Schedule = ({ pickedCourses, courseColors, handleColorChange }) => {
+  const groupedTimeslots = groupOverlappingTimeslots(pickedCourses);
   
   return (
     <div className="schedule-grid">
@@ -83,30 +83,31 @@ const Schedule = ({ pickedCourses }) => {
 
       {/* Render the predefined course blocks */}
       <div className="course-blocks">
-        {groupedCourses.map((group, groupIndex) => {
-          return group.map((course, courseIndex) => {
-            return course.schedule.map((timeslot, timeslotIndex) => {
-              const position = calculateGridPosition(timeslot, 9); // 9 is the minimal hour (09:00)
+        {groupedTimeslots.map((group, groupIndex) => {
+          return group.map((timeslot, timeslotIndex) => {
+            const position = calculateGridPosition(timeslot, 9); // 9 is the minimal hour (09:00)
+            const courseColor = courseColors[timeslot.course.id] || '#add8e6f2'; // Default color
 
-              return (
-                <React.Fragment key={`${course.id}-${timeslotIndex}`}>
-                  <div
-                    className="course-block"
-                    style={{
-                      gridRow: `${position.startRow} / ${position.endRow}`,
-                      gridColumn: `${position.dayColumn} / span 1`,
-                      zIndex: 1, // Ensure overlapping courses are visible
-                      width: `${100 / group.length}%`,
-                      left: `${(100 / group.length) * courseIndex}%`
-                    }}
-                  >
-                    <div className="course-title">{course.title}</div>
-                    <div className="course-time">{`${formatTime(timeslot.fromTime)} - ${formatTime(timeslot.toTime)}`}</div>
-                    <div className="course-location">{timeslot.location}</div>
-                  </div>
-                </React.Fragment>
-              );
-            });
+            return (
+              <React.Fragment key={`${timeslot.course.id}-${timeslotIndex}`}>
+                <div
+                  className="course-block"
+                  style={{
+                    gridRow: `${position.startRow} / ${position.endRow}`,
+                    gridColumn: `${position.dayColumn} / span 1`,
+                    zIndex: 1, // Ensure overlapping courses are visible
+                    width: `${100 / group.length}%`,
+                    left: `${(100 / group.length) * timeslotIndex}%`,
+                    backgroundColor: courseColor // Set the background color
+                  }}
+                  onClick={() => handleColorChange(timeslot.course.id)} // Handle color change on click
+                >
+                  <div className="course-title">{timeslot.course.title}</div>
+                  <div className="course-time">{`${formatTime(timeslot.fromTime)} - ${formatTime(timeslot.toTime)}`}</div>
+                  <div className="course-location">{timeslot.location}</div>
+                </div>
+              </React.Fragment>
+            );
           });
         })}
       </div>

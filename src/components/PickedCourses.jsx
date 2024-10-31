@@ -1,14 +1,17 @@
 import React from 'react';
 import { List, ListItem, ListItemText, IconButton, Tooltip } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
 import InfoIcon from '@mui/icons-material/Info';
+import DeleteIcon from '@mui/icons-material/Delete';
 
-const PickedCourses = ({ pickedCourses, removeCourse, showCourseDetails }) => {
+const PickedCourses = ({ pickedCourses, removeCourse, courseColors }) => {
   return (
-    <div style={{ maxHeight: '820px', overflow: 'auto' }}>
+    <div>
       <List>
-        {pickedCourses.map((course) => (
-          <ListItem key={course.id}>
+        {pickedCourses.map(course => (
+          <ListItem 
+            key={course.id} 
+            sx={{ borderLeft: `4px solid ${courseColors[course.id] || '#add8e6f2'}`, borderRadius: '4px', marginBottom: '8px' }}
+          >
             <ListItemText primary={`${course.id} - ${course.title}`} />
             <Tooltip title="More information">
               <IconButton
@@ -29,7 +32,7 @@ const PickedCourses = ({ pickedCourses, removeCourse, showCourseDetails }) => {
               >
                 <DeleteIcon />
               </IconButton>
-              </Tooltip>
+            </Tooltip>
           </ListItem>
         ))}
       </List>

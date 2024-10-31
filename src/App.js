@@ -1,16 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { Container, Grid, Tabs, Tab, Typography, Button, Dialog, DialogTitle, DialogContent, DialogContentText, TextField, MenuItem, List, ListItem, ListItemText, IconButton, Checkbox, FormControl, InputLabel, Select, OutlinedInput, Chip, FormControlLabel, Tooltip } from '@mui/material';
+import Cookies from 'js-cookie'
 /* import axios from 'axios'; */
 import AutocompleteSearch from './components/AutocompleteSearch';
 import PickedCourses from './components/PickedCourses';
 import Schedule from './components/Schedule';
 /* import ExportButtons from './components/ExportButtons'; */
+import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import InfoIcon from '@mui/icons-material/Info';
 
 function App() {
   const [courses, setCourses] = useState([]);   // All available courses
-  const [pickedCourses, setPickedCourses] = useState({ 1: [], 2: [], 0: [] });  // Initialize three semesters (1 and 2 by default, 0 can be added dynamically)
+  const [pickedCourses, setPickedCourses] = useState(() => {
+    const savedPickedCourses = Cookies.get('pickedCourses');
+    return savedPickedCourses ? JSON.parse(savedPickedCourses) : { 1: [], 2: [], 3: [] };
+  });
   const [availableSemesters, setAvailableSemesters] = useState([1, 2]); // Initialize with Semester 1 and 2
   const [activeSemester, setActiveSemester] = useState(1); // Default to Semester 1
   const [selectedCourseDetails, setSelectedCourseDetails] = useState(null); // For the info dialog
@@ -22,7 +27,8 @@ function App() {
   const [fieldOfStudyOptions, setFieldOfStudyOptions] = useState([]); // Available fields of study for the dropdown
   const [hideOverlapping, setHideOverlapping] = useState(false); // State to control hiding of overlapping courses
   const [showFromTimeFilter, setShowFromTimeFilter] = useState(false); // State to control visibility of fromTime filter
-  const [fromTime, setFromTime] = useState('')
+  const [fromTime, setFromTime] = useState('') // State to manage fromTime filter
+  const [courseColors, setCourseColors] = useState({}); // State to manage course colors
 
 
 
@@ -39,7 +45,7 @@ function App() {
         const id = course.id && (typeof course.id === 'string' || typeof course.id === 'number') ? course.id : 'Unknown ID';
       
         // Verify semester is a valid number
-        const semester = course.semester && typeof course.semester === 'number' ? course.semester : 'Unknown Semester';
+        const semester = course.semester && typeof course.semester === 'number' ? course.semester : 0; // Default to 0 if invalid
       
         // Verify schedule is an array and contains valid entries
         const schedule = Array.isArray(course.schedule) && course.schedule.every(slot => 
@@ -102,12 +108,7 @@ function App() {
         // Add the course to the correct semester
         updatedPickedCourses[course.semester].push(course);
 
-        // If course belongs to Semester 3, dynamically add Semester 3 to availableSemesters
-        if (course.semester === 3 && !availableSemesters.includes(3)) {
-          setAvailableSemesters(prevSemesters => [...prevSemesters, 3]);
-        }
-
-        console.log('Updated pickedCourses:', updatedPickedCourses);  // Log the updated pickedCourses
+        Cookies.set('pickedCourses', JSON.stringify(updatedPickedCourses), { expires: 7 });
 
         return updatedPickedCourses;
       }
@@ -127,11 +128,15 @@ function App() {
   
       // Update the state by removing the course
       const updatedSemesterCourses = prevState[semester].filter(course => course.id !== courseId);
-  
-      return {
+      
+      const updatedPickedCourses = {
         ...prevState,
         [semester]: updatedSemesterCourses,
       };
+
+      Cookies.set('pickedCourses', JSON.stringify(updatedPickedCourses), { expires: 7 });
+
+      return updatedPickedCourses;
     });
   
     console.log('Course removed, updated pickedCourses:', pickedCourses);
@@ -193,23 +198,45 @@ function App() {
 
   // Filter out picked courses from the available course list
   const filteredCourses = courses.filter(course => 
-    !pickedCourses[activeSemester]?.some(pickedCourse => pickedCourse.id === course.id)
+    !Object.values(pickedCourses).some(semesterCourses => 
+      semesterCourses.some(pickedCourse => pickedCourse.id === course.id)
+    )
   );
 
   // Detect if a course overlaps with any picked courses
   const doesCourseOverlap = (course) => {
     return Object.values(pickedCourses).some(semesterCourses => 
       semesterCourses.some(pickedCourse => 
-        course.schedule.some(courseSchedule => 
-          pickedCourse.schedule.some(pickedSchedule => 
-            courseSchedule.day === pickedSchedule.day && 
-            course.semester === pickedCourse.semester && 
-            courseSchedule.fromTime < pickedSchedule.toTime && 
-            courseSchedule.toTime > pickedSchedule.fromTime
-          )
+      course.schedule.some(courseSchedule => 
+        pickedCourse.schedule.some(pickedSchedule => 
+        courseSchedule.day === pickedSchedule.day && 
+        (course.semester === pickedCourse.semester || course.semester === 0 || pickedCourse.semester === 0) && 
+        courseSchedule.fromTime < pickedSchedule.toTime && 
+        courseSchedule.toTime > pickedSchedule.fromTime
         )
       )
+      )
     );
+  };
+
+  // Function to handle color change for a course
+  const handleColorChange = (courseId) => {
+    setCourseColors(prevColors => {
+      const newColor = `#${Math.floor(Math.random()*16777215).toString(16)}`; // Generate a random color
+      return { ...prevColors, [courseId]: newColor };
+    });
+  };
+
+
+  // Function to handle color change manually for a course
+  const handleColorChangeManual = (courseId) => {
+    const newColor = prompt('Enter a new color (e.g., #ff0000 or red):');
+    if (newColor) {
+      setCourseColors(prevColors => ({
+        ...prevColors,
+        [courseId]: newColor
+      }));
+    }
   };
 
 // Filter courses in the modal based on the search query and filters (OR condition for days/fields)
@@ -266,15 +293,17 @@ const browseFilteredCourses = courses.filter(course => {
       {activeSemester && pickedCourses[activeSemester] && (
         <Grid container spacing={3}>
           {/* Schedule: Weekly Calendar */}
-          <Grid item xs={12} sm={8}>
+          <Grid item xs={12} sm={8} marginTop={2}>
             <Schedule 
-              pickedCourses={pickedCourses[activeSemester] || []} 
+              pickedCourses={[...(pickedCourses[activeSemester] || []), ...(pickedCourses[0] || [])]} 
               removeCourse={removeCourse}
+              courseColors={courseColors}
+              handleColorChange={handleColorChange}
             />
           </Grid>
 
           {/* Right Sidebar: Picked Courses */}
-          <Grid item xs={12} sm={4} md ={4}>
+          <Grid item xs={12} sm={4} md ={4} marginTop={2}>
             {/* Browse Courses Button */}
             <Button
               variant="contained"
@@ -286,6 +315,20 @@ const browseFilteredCourses = courses.filter(course => {
             >
               Browse Courses
             </Button>
+            
+            <Tooltip title="Clear all picked courses" placement="bottom">
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={() => {
+                setPickedCourses({ 1: [], 2: [], 3: [] });
+                Cookies.set('pickedCourses', JSON.stringify({ 1: [], 2: [], 3: [] }), { expires: 7 });
+              }}
+              style={{ marginBottom: '10px', marginTop: '-20px', marginLeft: "5px", backgroundColor: '#ff6666' }}
+            >
+              <DeleteIcon />
+            </Button>
+            </Tooltip>
 
             {/* Search Bar */}
             <AutocompleteSearch 
@@ -295,9 +338,10 @@ const browseFilteredCourses = courses.filter(course => {
 
             {/* Picked Courses List */}
             <PickedCourses 
-              pickedCourses={pickedCourses[activeSemester] || []} // Show picked courses for active semester
+              pickedCourses={[...(pickedCourses[activeSemester] || []), ...(pickedCourses[0] || [])]} // Show picked courses for active (and yearly) semester
               removeCourse={removeCourse}
               showCourseDetails={handleShowCourseDetails}
+              courseColors={courseColors}
             />
           </Grid>
         </Grid>
@@ -330,14 +374,19 @@ const browseFilteredCourses = courses.filter(course => {
 
           {/* Checkbox to show/hide fromTime filter */}
           <FormControlLabel
-            control={
-              <Checkbox
-                checked={showFromTimeFilter}
-                onChange={(e) => setShowFromTimeFilter(e.target.checked)}
-              />
-            }
-            label="Enable Developer Options"
-          />
+              control={
+                <Checkbox
+                  checked={showFromTimeFilter}
+                  onChange={(e) => {
+                    setShowFromTimeFilter(e.target.checked);
+                    if (!e.target.checked) {
+                      setFromTime(''); // Reset fromTime when checkbox is unchecked
+                    }
+                  }}
+                />
+              }
+              label="Enable Developer Options"
+            />
 
           {/* Semester Filter */}
           <TextField
@@ -442,35 +491,78 @@ const browseFilteredCourses = courses.filter(course => {
                     <ListItemText primary={`${course.id} - ${course.title}`} />
                     {isPicked ? (
                       <>
-                        <Tooltip title="More information">
+                        <Tooltip title="More information"      
+                        slotProps={{
+                                    popper: {
+                                      modifiers: [
+                                        {
+                                          name: 'offset',
+                                          options: {
+                                            offset: [0, -14],
+                                          },
+                                        },
+                                      ],
+                                    },
+                                  }}
+                        >
                           <IconButton
                             edge="end"
                             aria-label="info"
                             onClick={() => window.open(course.URL, '_blank')}
-                            sx={{ color: 'blue', marginRight: 1 }} // Custom styling for InfoIcon
+                            sx={{ marginRight: 1 }} // Custom styling for InfoIcon
                           >
                             <InfoIcon />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Remove course">
+
+                        <Tooltip title="Remove course"
+                                                slotProps={{
+                                                  popper: {
+                                                    modifiers: [
+                                                      {
+                                                        name: 'offset',
+                                                        options: {
+                                                          offset: [0, -14],
+                                                        },
+                                                      },
+                                                    ],
+                                                  },
+                                                }}
+                        >
                           <IconButton
                             edge="end"
                             aria-label="remove"
                             onClick={() => removeCourse(course.id, course.semester)}
-                            sx={{ color: 'red' }} // Custom styling for DeleteIcon
+
                           >
                             <DeleteIcon />
                           </IconButton>
                         </Tooltip>
                       </>
                     ) : (
-                      <Button
-                        variant="outlined"
-                        color="primary"
+                      <Tooltip title="Add course"
+                      slotProps={{
+                        popper: {
+                          modifiers: [
+                            {
+                              name: 'offset',
+                              options: {
+                                offset: [0, -14],
+                              },
+                            },
+                          ],
+                        },
+                      }}
+                      > 
+                      <IconButton
+                        edge="end"
+                        aria-label="add"
                         onClick={() => addCourse(course)}
+
                       >
-                        Add
-                      </Button>
+                        <AddIcon />
+                      </IconButton>
+                    </Tooltip>
                     )}
                   </ListItem>
                 );
@@ -488,7 +580,7 @@ const browseFilteredCourses = courses.filter(course => {
           Have suggestions? Submit them <a href="https://freesuggestionbox.com/pub/nzuzbfb" target="_blank" rel="noopener noreferrer">here</a>.
         </Typography>
         <Typography variant="body2" color="textPrimary" style={{ textAlign: 'left', marginTop: '25px' }}>
-          <em> Release Notes: </em> New small features; stay tuned for color customization and export options.
+          <em> Release Notes: </em> You can now add some color to your life by clicking on the course blocks!
         </Typography>
       </header>
     </Container>
