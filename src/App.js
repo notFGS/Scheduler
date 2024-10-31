@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Grid, Tabs, Tab, Typography, Button, Dialog, DialogTitle, DialogContent, DialogContentText, TextField, MenuItem, List, ListItem, ListItemText, IconButton, Checkbox, FormControl, InputLabel, Select, OutlinedInput, Chip, FormControlLabel } from '@mui/material';
-import axios from 'axios';
+import { Container, Grid, Tabs, Tab, Typography, Button, Dialog, DialogTitle, DialogContent, DialogContentText, TextField, MenuItem, List, ListItem, ListItemText, IconButton, Checkbox, FormControl, InputLabel, Select, OutlinedInput, Chip, FormControlLabel, Tooltip } from '@mui/material';
+/* import axios from 'axios'; */
 import AutocompleteSearch from './components/AutocompleteSearch';
 import PickedCourses from './components/PickedCourses';
 import Schedule from './components/Schedule';
 /* import ExportButtons from './components/ExportButtons'; */
 import DeleteIcon from '@mui/icons-material/Delete';
+import InfoIcon from '@mui/icons-material/Info';
 
 function App() {
   const [courses, setCourses] = useState([]);   // All available courses
-  const [pickedCourses, setPickedCourses] = useState({ 1: [], 2: [], 3: [] });  // Initialize three semesters (1 and 2 by default, 3 can be added dynamically)
+  const [pickedCourses, setPickedCourses] = useState({ 1: [], 2: [], 0: [] });  // Initialize three semesters (1 and 2 by default, 0 can be added dynamically)
   const [availableSemesters, setAvailableSemesters] = useState([1, 2]); // Initialize with Semester 1 and 2
   const [activeSemester, setActiveSemester] = useState(1); // Default to Semester 1
   const [selectedCourseDetails, setSelectedCourseDetails] = useState(null); // For the info dialog
@@ -20,29 +21,56 @@ function App() {
   const [selectedFields, setSelectedFields] = useState([]);  // Multi-select for field of study
   const [fieldOfStudyOptions, setFieldOfStudyOptions] = useState([]); // Available fields of study for the dropdown
   const [hideOverlapping, setHideOverlapping] = useState(false); // State to control hiding of overlapping courses
+  const [showFromTimeFilter, setShowFromTimeFilter] = useState(false); // State to control visibility of fromTime filter
+  const [fromTime, setFromTime] = useState('')
+
+
+
+  const validDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+  const timeFormatRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
   // Fetch courses from the local file
   useEffect(() => {
     fetch(`${process.env.PUBLIC_URL}/courses.json`)  // Adjusted for GitHub Pages
     .then(response => response.json())
     .then(fetchedCourses => {
-        const courses = fetchedCourses.map(course => ({
-          id: course.Code,
-          semester: course.SR,
-          title: course.CourseTitle,
-          field: course.MainFieldOfStudy,
-          day: course.Courseday,
-          fromTime: course.CourseFromTime,
-          toTime: course.CourseToTime,
-          location: course.Courselocation,
-          day2: course.Courseday2,
-          fromTime2: course.CourseFromTime2,
-          toTime2: course.CourseToTime2,
-          location2: course.Courselocation2
-        }));
+      const courses = fetchedCourses.map(course => {
+        // Verify id is a non-empty string or number
+        const id = course.id && (typeof course.id === 'string' || typeof course.id === 'number') ? course.id : 'Unknown ID';
+      
+        // Verify semester is a valid number
+        const semester = course.semester && typeof course.semester === 'number' ? course.semester : 'Unknown Semester';
+      
+        // Verify schedule is an array and contains valid entries
+        const schedule = Array.isArray(course.schedule) && course.schedule.every(slot => 
+          validDays.includes(slot.day) &&
+          timeFormatRegex.test(slot.fromTime) &&
+          timeFormatRegex.test(slot.toTime) &&
+          slot.location && typeof slot.location === 'string'
+        ) ? course.schedule : [];
+      
+        return {
+          id,
+          semester,
+          title: course.title,
+          fields: course.fields,
+          schedule,  // Directly use verified schedule array
+          startDate: course.startDate,
+          endDate: course.endDate,
+          URL: course.URL,
+          INDEX: course.INDEX,
+        };
+      });
 
-        // Extract unique fields of study
-        const uniqueFields = [...new Set(courses.map(course => course.field || ''))];  // Assign '' for missing fields
+        courses.sort((a, b) => {return a.title.localeCompare(b.title);}); // Sort courses alphabetically by title
+      
+        // Extract unique fields of study from the "fields" attribute
+        const uniqueFields = [...new Set(courses.flatMap(course => course.fields || []))];  // Flatten the fields arrays and remove duplicates
+        uniqueFields.sort((a, b) => {
+          if (a.startsWith("Phys") && !b.startsWith("Phys")) return -1; // Sort Physics first
+          if (!a.startsWith("Phys") && b.startsWith("Phys")) return 1; 
+          return a.localeCompare(b);
+        });
         setFieldOfStudyOptions(uniqueFields);
         setCourses(courses);
     })
@@ -50,6 +78,12 @@ function App() {
         console.error('Error fetching courses:', error);
     });
 }, []);
+
+  useEffect(() => {
+    if (window.goatcounter) {
+      window.goatcounter.count();
+    }
+  }, []);
 
   // Add course to the correct semester (ONLY when the user selects it)
   const addCourse = (course) => {
@@ -141,6 +175,22 @@ function App() {
     setSelectedFields(typeof value === 'string' ? value.split(',') : value);
   };
 
+  // Function to handle from time change
+  const handleFromTimeChange = (event) => {
+    setFromTime(event.target.value);
+  };
+
+
+  // Generate time options for the dropdown
+  const generateTimeOptions = () => {
+    const times = [];
+    for (let hour = 9; hour <= 18; hour++) {
+      const time = `${String(hour).padStart(2, '0')}:00`;
+      times.push(time);
+    }
+    return times;
+  };
+
   // Filter out picked courses from the available course list
   const filteredCourses = courses.filter(course => 
     !pickedCourses[activeSemester]?.some(pickedCourse => pickedCourse.id === course.id)
@@ -149,32 +199,38 @@ function App() {
   // Detect if a course overlaps with any picked courses
   const doesCourseOverlap = (course) => {
     return Object.values(pickedCourses).some(semesterCourses => 
-      semesterCourses.some(pickedCourse => (
-        course.day === pickedCourse.day && 
-        course.semester === pickedCourse.semester && (
-          course.fromTime < pickedCourse.toTime && course.toTime > pickedCourse.fromTime
+      semesterCourses.some(pickedCourse => 
+        course.schedule.some(courseSchedule => 
+          pickedCourse.schedule.some(pickedSchedule => 
+            courseSchedule.day === pickedSchedule.day && 
+            course.semester === pickedCourse.semester && 
+            courseSchedule.fromTime < pickedSchedule.toTime && 
+            courseSchedule.toTime > pickedSchedule.fromTime
+          )
         )
-      ))
+      )
     );
   };
 
 // Filter courses in the modal based on the search query and filters (OR condition for days/fields)
 const browseFilteredCourses = courses.filter(course => {
   const courseIdStr = course.id ? course.id.toString().toLowerCase() : '';  // Convert id to string safely
-  const courseFieldStr = course.field ? course.field.toLowerCase() : '';  // Handle missing course.field
 
-  const matchesDay = selectedDays.length === 0 || selectedDays.some(day => course.day === day); // OR logic for days
-  const matchesField = selectedFields.length === 0 || selectedFields.some(field => field === '' ? courseFieldStr === '' : course.field === field); // OR logic for fields, including blank field
+  const matchesDay = selectedDays.length === 0 || selectedDays.some(day => course.schedule.some(scheduleEntry => scheduleEntry.day === day)); // OR logic for days
+  const matchesField = selectedFields.length === 0 || selectedFields.some(field => course.fields.includes(field)); // OR logic for fields
+  const matchesFromTime = fromTime === '' || course.schedule.some(slot => slot.fromTime >= fromTime);
+
 
   // Check if the course should be hidden due to overlap
   if (hideOverlapping && doesCourseOverlap(course)) {
     return false;
   }
 
+
   return (
     (searchQuery === '' || courseIdStr.includes(searchQuery.toLowerCase()) || course.title.toLowerCase().includes(searchQuery.toLowerCase())) &&
     (filterSemester === '' || course.semester === filterSemester) &&
-    matchesDay && matchesField
+    matchesDay && matchesField && matchesFromTime
   );
 });
 
@@ -218,7 +274,7 @@ const browseFilteredCourses = courses.filter(course => {
           </Grid>
 
           {/* Right Sidebar: Picked Courses */}
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={4} md ={4}>
             {/* Browse Courses Button */}
             <Button
               variant="contained"
@@ -247,33 +303,8 @@ const browseFilteredCourses = courses.filter(course => {
         </Grid>
       )}
 
-      {/* Dialog for course details */}
-      {selectedCourseDetails && (
-        <Dialog open={!!selectedCourseDetails} onClose={handleCloseDetails}>
-          <DialogTitle>Course Details</DialogTitle>
-          <DialogContent>
-            {selectedCourseDetails && (
-              <DialogContentText>
-                <strong>ID:</strong> {selectedCourseDetails.id} <br />
-                <strong>Title:</strong> {selectedCourseDetails.title} <br />
-                <strong>Field of Study:</strong> {selectedCourseDetails.field} <br />
-                <strong>Day:</strong> {selectedCourseDetails.day} <br />
-                <strong>Time:</strong> {selectedCourseDetails.fromTime}:00 - {selectedCourseDetails.toTime}:00 <br />
-                {selectedCourseDetails.day2 && (
-                  <>
-                    <strong>Day 2:</strong> {selectedCourseDetails.day2} <br />
-                    <strong>Time 2:</strong> {selectedCourseDetails.fromTime2}:00 - {selectedCourseDetails.toTime2}:00 <br />
-                  </>
-                )}
-                <strong>Location:</strong> {selectedCourseDetails.location}
-              </DialogContentText>
-            )}
-          </DialogContent>
-          </Dialog>
-        )}
-  
       {/* Course Browsing Modal */}
-      <Dialog open={isBrowseModalOpen} onClose={() => setIsBrowseModalOpen(false)} maxWidth="md" fullWidth >
+      <Dialog open={isBrowseModalOpen} onClose={handleBrowseCoursesClose} maxWidth="md" fullWidth >
         <DialogTitle>Browse Courses</DialogTitle>
         <DialogContent>
 
@@ -297,6 +328,17 @@ const browseFilteredCourses = courses.filter(course => {
             label="Hide Overlapping Courses"
           />
 
+          {/* Checkbox to show/hide fromTime filter */}
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={showFromTimeFilter}
+                onChange={(e) => setShowFromTimeFilter(e.target.checked)}
+              />
+            }
+            label="Enable Developer Options"
+          />
+
           {/* Semester Filter */}
           <TextField
             select
@@ -310,7 +352,7 @@ const browseFilteredCourses = courses.filter(course => {
             <MenuItem value="">All Semesters</MenuItem>
             <MenuItem value={1}>Semester 1</MenuItem>
             <MenuItem value={2}>Semester 2</MenuItem>
-            <MenuItem value={3}>Semester 3</MenuItem>
+            <MenuItem value={0}>Yearly \ Summer</MenuItem>
           </TextField>
 
           {/* Days Multi-Select Filter */}
@@ -329,7 +371,7 @@ const browseFilteredCourses = courses.filter(course => {
                 </div>
               )}
             >
-              {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'].map((day) => (
+              {validDays.map((day) => (
                 <MenuItem key={day} value={day}>
                   <Checkbox checked={selectedDays.indexOf(day) > -1} />
                   {day}
@@ -353,6 +395,13 @@ const browseFilteredCourses = courses.filter(course => {
                   ))}
                 </div>
               )}
+              MenuProps={{
+                PaperProps: {
+                  style: {
+                    maxHeight: 280, // Set the maximum height for the dropdown menu
+                  },
+                },
+              }}
             >
               {fieldOfStudyOptions.map((field) => (
                 <MenuItem key={field} value={field}>
@@ -363,8 +412,27 @@ const browseFilteredCourses = courses.filter(course => {
             </Select>
           </FormControl>
 
+
+          {/* From Time Filter */}
+          {showFromTimeFilter && (
+            <FormControl fullWidth margin="dense">
+              <InputLabel>I don't want to get up before...</InputLabel>
+              <Select
+                value={fromTime}
+                onChange={handleFromTimeChange}
+                input={<OutlinedInput label="I don't want to get up before..." />}
+              >
+                {generateTimeOptions().map((time) => (
+                  <MenuItem key={time} value={time}>
+                    {time}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
           {/* List of Filtered Courses */}
-          <div style={{ minHeight: '400px', maxHeight: '400px', overflowY: 'auto' }}>
+          <div style={{ minHeight: '200px', maxHeight: '400px', overflowY: 'auto' }}>
             <List>
               {browseFilteredCourses.map(course => {
                 const isPicked = pickedCourses[course.semester]?.some(pickedCourse => pickedCourse.id === course.id);
@@ -373,13 +441,28 @@ const browseFilteredCourses = courses.filter(course => {
                   <ListItem key={course.id} button={true}>
                     <ListItemText primary={`${course.id} - ${course.title}`} />
                     {isPicked ? (
-                      <IconButton
-                        edge="end"
-                        aria-label="remove"
-                        onClick={() => removeCourse(course.id, course.semester)}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      <>
+                        <Tooltip title="More information">
+                          <IconButton
+                            edge="end"
+                            aria-label="info"
+                            onClick={() => window.open(course.URL, '_blank')}
+                            sx={{ color: 'blue', marginRight: 1 }} // Custom styling for InfoIcon
+                          >
+                            <InfoIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Remove course">
+                          <IconButton
+                            edge="end"
+                            aria-label="remove"
+                            onClick={() => removeCourse(course.id, course.semester)}
+                            sx={{ color: 'red' }} // Custom styling for DeleteIcon
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </>
                     ) : (
                       <Button
                         variant="outlined"
@@ -397,9 +480,15 @@ const browseFilteredCourses = courses.filter(course => {
         </DialogContent>
       </Dialog>
 
-      <header style={{ textAlign: 'center', marginTop: '25px' }}>
+      <header style={{ textAlign: 'center', marginTop: '25px', marginBottom: '25px'}}>
         <Typography variant="body2" color="textPrimary">
           Course data may not be up-to-date. Please verify with the official schedule.
+        </Typography>
+        <Typography variant="body2" color="textPrimary">
+          Have suggestions? Submit them <a href="https://freesuggestionbox.com/pub/nzuzbfb" target="_blank" rel="noopener noreferrer">here</a>.
+        </Typography>
+        <Typography variant="body2" color="textPrimary" style={{ textAlign: 'left', marginTop: '25px' }}>
+          <em> Release Notes: </em> New small features; stay tuned for color customization and export options.
         </Typography>
       </header>
     </Container>
@@ -407,4 +496,4 @@ const browseFilteredCourses = courses.filter(course => {
 };
   
   export default App;
-  
+

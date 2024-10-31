@@ -3,22 +3,20 @@ import './Schedule.css';
 
 // Helper function to format time in HH:MM format
 const formatTime = (time) => {
-  const hours = Math.floor(time / 100);
-  const minutes = time % 100;
+  const [hours, minutes] = time.split(':').map(Number);
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
 
-// Helper function to convert time (e.g., 1430) to fractional hours (e.g., 14.5)
+// Helper function to convert time (e.g., "14:30") to fractional hours (e.g., 14.5)
 const convertToFractionalHour = (time) => {
-  const hour = Math.floor(time / 100);
-  const minutes = time % 100;
-  return hour + minutes / 60;
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours + minutes / 60;
 };
 
 // Function to calculate the grid position based on time and day (15-minute intervals)
-const calculateGridPosition = (course, minHour, isSecondary = false) => {
-  const startHour = convertToFractionalHour(isSecondary ? course.fromTime2 : course.fromTime);
-  const endHour = convertToFractionalHour(isSecondary ? course.toTime2 : course.toTime);
+const calculateGridPosition = (timeslot, minHour) => {
+  const startHour = convertToFractionalHour(timeslot.fromTime);
+  const endHour = convertToFractionalHour(timeslot.toTime);
 
   // Multiply by 4 because each hour has 4 blocks (15-minute increments)
   // Subtract 1 from startRow to adjust the position backwards by 15 minutes
@@ -26,7 +24,7 @@ const calculateGridPosition = (course, minHour, isSecondary = false) => {
   const endRow = Math.floor((endHour - minHour) * 4) + 1; // Adjust by -00:15 to prevent extending block by 15 minutes
 
   // Correct calculation for day column
-  const dayColumn = days.indexOf(isSecondary ? course.day2 : course.day) + 1; // Day columns should start from 1 (Sunday)
+  const dayColumn = days.indexOf(timeslot.day) + 1; // Day columns should start from 1 (Sunday)
 
   return { startRow, endRow, dayColumn };
 };
@@ -46,8 +44,10 @@ const groupOverlappingCourses = (courses) => {
   courses.forEach(course => {
     let added = false;
     for (const group of groups) {
-      if (group.some(c => (c.fromTime < course.toTime && c.toTime > course.fromTime
-          && c.day === course.day
+      if (group.some(c => c.schedule.some(timeslot => 
+        course.schedule.some(ts => 
+          ts.fromTime < timeslot.toTime && ts.toTime > timeslot.fromTime && ts.day === timeslot.day
+        )
       ))) {
         group.push(course);
         added = true;
@@ -85,43 +85,28 @@ const Schedule = ({ pickedCourses }) => {
       <div className="course-blocks">
         {groupedCourses.map((group, groupIndex) => {
           return group.map((course, courseIndex) => {
-            const primaryPosition = calculateGridPosition(course, 9); // 9 is the minimal hour (09:00)
-            const secondaryPosition = course.day2 ? calculateGridPosition(course, 9, true) : null;
+            return course.schedule.map((timeslot, timeslotIndex) => {
+              const position = calculateGridPosition(timeslot, 9); // 9 is the minimal hour (09:00)
 
-            return (
-              <React.Fragment key={course.id}>
-                <div
-                  className="course-block"
-                  style={{
-                    gridRow: `${primaryPosition.startRow} / ${primaryPosition.endRow}`,
-                    gridColumn: `${primaryPosition.dayColumn} / span 1`,
-                    zIndex: 1, // Ensure overlapping courses are visible
-                    width: `${100 / group.length}%`,
-                    left: `${(100 / group.length) * courseIndex}%`
-                  }}
-                >
-                  <div className="course-title">{course.title}</div>
-                  <div className="course-time">{`${formatTime(course.fromTime)} - ${formatTime(course.toTime)}`}</div>
-                  <div className="course-location">{course.location}</div>
-                </div>
-                {secondaryPosition && (
+              return (
+                <React.Fragment key={`${course.id}-${timeslotIndex}`}>
                   <div
                     className="course-block"
                     style={{
-                      gridRow: `${secondaryPosition.startRow} / ${secondaryPosition.endRow}`,
-                      gridColumn: `${secondaryPosition.dayColumn} / span 1`,
+                      gridRow: `${position.startRow} / ${position.endRow}`,
+                      gridColumn: `${position.dayColumn} / span 1`,
                       zIndex: 1, // Ensure overlapping courses are visible
                       width: `${100 / group.length}%`,
                       left: `${(100 / group.length) * courseIndex}%`
                     }}
                   >
                     <div className="course-title">{course.title}</div>
-                    <div className="course-time">{`${formatTime(course.fromTime2)} - ${formatTime(course.toTime2)}`}</div>
-                    <div className="course-location">{course.location}</div>
+                    <div className="course-time">{`${formatTime(timeslot.fromTime)} - ${formatTime(timeslot.toTime)}`}</div>
+                    <div className="course-location">{timeslot.location}</div>
                   </div>
-                )}
-              </React.Fragment>
-            );
+                </React.Fragment>
+              );
+            });
           });
         })}
       </div>

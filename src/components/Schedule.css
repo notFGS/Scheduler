@@ -78,6 +78,8 @@
 
 /* Course blocks */
 .course-blocks {
+  width: 700px;
+  height: 880px;
   grid-column: 2 / 7;
   grid-row: 2 / -1;
   display: grid;
