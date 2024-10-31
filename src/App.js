@@ -239,6 +239,7 @@ function App() {
     }
   };
 
+  
 // Filter courses in the modal based on the search query and filters (OR condition for days/fields)
 const browseFilteredCourses = courses.filter(course => {
   const courseIdStr = course.id ? course.id.toString().toLowerCase() : '';  // Convert id to string safely

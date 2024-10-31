@@ -3,7 +3,7 @@ import { Autocomplete, TextField, Popper, Button, Box } from '@mui/material';
 
 const AutocompleteSearch = ({ courses, addCourse }) => {
   const [filteredCourses, setFilteredCourses] = useState(courses);
-  const [filter, setFilter] = useState(['sem1', 'sem2', 'other']);
+  const [filter, setFilter] = useState(([], [], []), (['sem1', 'sem2', 'other']));
   const [inputValue, setInputValue] = useState('');
   const [open, setOpen] = useState(false);
 
@@ -12,7 +12,9 @@ const AutocompleteSearch = ({ courses, addCourse }) => {
   }, [courses, filter]);
 
   const applyFilter = (filter) => {
-    if (filter.includes('sem1') && filter.includes('sem2') && filter.includes('other')) {
+    if (filter.length === 0) {
+      setFilteredCourses(courses);
+    } else if (filter.includes('sem1') && filter.includes('sem2') && filter.includes('other')) {
       setFilteredCourses(courses);
     } else if (filter.includes('sem1') && filter.includes('sem2')) {
       setFilteredCourses(courses.filter(course => course.semester === 1 || course.semester === 2));
