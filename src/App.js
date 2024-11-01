@@ -486,6 +486,9 @@ const browseFilteredCourses = courses.filter(course => {
         <Typography variant="body2" color="textPrimary" style={{ textAlign: 'left', marginTop: '25px' }}>
           <em> Release Notes: </em> You can now add some color to your life by clicking on the course blocks!
         </Typography>
+        <Typography variant="body2" color="textPrimary" style={{ textAlign: 'left' }}>
+          App created by Itai Madar.
+        </Typography>
       </header>
     </Container>
   );
