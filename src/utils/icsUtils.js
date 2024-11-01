@@ -35,4 +35,26 @@ END:VCALENDAR
 
 return icsContent;
 }
+
+export function parseICS(icsContent) {
+  const events = [];
+  const eventRegex = /BEGIN:VEVENT([\s\S]*?)END:VEVENT/g;
+  let match;
+
+  while ((match = eventRegex.exec(icsContent)) !== null) {
+    const eventText = match[1];
+    const event = {};
+
+    eventText.split('\n').forEach(line => {
+      const [key, value] = line.split(':');
+      if (key && value) {
+        event[key.trim()] = value.trim();
+      }
+    });
+
+    events.push(event);
+  }
+
+  return events;
+}
   

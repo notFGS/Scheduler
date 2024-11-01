@@ -1,25 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Grid, Tabs, Tab, Typography, Button, Dialog, DialogTitle, DialogContent, DialogContentText, TextField, MenuItem, List, ListItem, ListItemText, IconButton, Checkbox, FormControl, InputLabel, Select, OutlinedInput, Chip, FormControlLabel, Tooltip } from '@mui/material';
+import { Container, Grid, Tabs, Tab, Typography, Button, Tooltip} from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import Cookies from 'js-cookie'
 /* import axios from 'axios'; */
 import AutocompleteSearch from './components/AutocompleteSearch';
 import PickedCourses from './components/PickedCourses';
 import Schedule from './components/Schedule';
-/* import ExportButtons from './components/ExportButtons'; */
-import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import InfoIcon from '@mui/icons-material/Info';
+import BrowseModal from './components/BrowseModal';
+import IconButton from '@mui/material/IconButton';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import SearchIcon from '@mui/icons-material/Search';
+import { exportToPng, exportToPdf, exportToIcs, loadIcsFile } from './utils/exportUtils';
 
 function App() {
   const [courses, setCourses] = useState([]);   // All available courses
   const [pickedCourses, setPickedCourses] = useState(() => {
     const savedPickedCourses = Cookies.get('pickedCourses');
-    return savedPickedCourses ? JSON.parse(savedPickedCourses) : { 1: [], 2: [], 3: [] };
+    return savedPickedCourses ? JSON.parse(savedPickedCourses) : { 1: [], 2: [], 0: [] };
   });
-  const [availableSemesters, setAvailableSemesters] = useState([1, 2]); // Initialize with Semester 1 and 2
+  const [availableSemesters] = useState([1, 2]); // Initialize with Semester 1 and 2
   const [activeSemester, setActiveSemester] = useState(1); // Default to Semester 1
-  const [selectedCourseDetails, setSelectedCourseDetails] = useState(null); // For the info dialog
   const [isBrowseModalOpen, setIsBrowseModalOpen] = useState(false);  // State to control course browsing modal
+  const [isOptionsDialogOpen, setIsOptionsDialogOpen] = useState(false);  // State to control options dialog
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);  // State to control confirm dialog
   const [searchQuery, setSearchQuery] = useState('');  // Search query for course browsing
   const [filterSemester, setFilterSemester] = useState('');  // Filter by semester in modal
   const [selectedDays, setSelectedDays] = useState([]);  // Multi-select for day filtering
@@ -29,8 +33,6 @@ function App() {
   const [showFromTimeFilter, setShowFromTimeFilter] = useState(false); // State to control visibility of fromTime filter
   const [fromTime, setFromTime] = useState('') // State to manage fromTime filter
   const [courseColors, setCourseColors] = useState({}); // State to manage course colors
-
-
 
   const validDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
   const timeFormatRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -150,14 +152,6 @@ function App() {
     console.log('Active semester changed to:', newValue);  // Debug log
   };
 
-  const handleShowCourseDetails = (course) => {
-    setSelectedCourseDetails(course);
-  };
-
-  const handleCloseDetails = () => {
-    setSelectedCourseDetails(null);
-  };
-
   // Open the browse courses modal
   const handleBrowseCoursesOpen = () => {
     setIsBrowseModalOpen(true);
@@ -167,6 +161,42 @@ function App() {
   const handleBrowseCoursesClose = () => {
     setIsBrowseModalOpen(false);
   };
+
+  // Open the options dialog
+  const handleOptionsDialogOpen = () => {
+    setIsOptionsDialogOpen(true);
+  };
+
+  // Close the options dialog
+  const handleOptionsDialogClose = () => {
+    setIsOptionsDialogOpen(false);
+  };
+
+  // Open the confirm dialog
+  const handleConfirmDialogOpen = () => {
+    if (pickedCourses[activeSemester].length === 0) {
+      return;
+    }
+    setIsConfirmDialogOpen(true);
+  };
+
+  // Close the confirm dialog
+  const handleConfirmDialogClose = () => {
+    setIsConfirmDialogOpen(false);
+  };
+
+  // Confirm and clear picked courses
+  const handleConfirmClearCourses = () => {
+    setPickedCourses(prevState => {
+      const updatedPickedCourses = { ...prevState };
+      updatedPickedCourses[activeSemester] = [];
+      updatedPickedCourses[0] = [];
+      Cookies.set('pickedCourses', JSON.stringify(updatedPickedCourses), { expires: 7 });
+      return updatedPickedCourses;
+    });
+    handleConfirmDialogClose();
+  };
+
 
   // Function to handle multi-select for days
   const handleDaysChange = (event) => {
@@ -179,12 +209,6 @@ function App() {
     const { value } = event.target;
     setSelectedFields(typeof value === 'string' ? value.split(',') : value);
   };
-
-  // Function to handle from time change
-  const handleFromTimeChange = (event) => {
-    setFromTime(event.target.value);
-  };
-
 
   // Generate time options for the dropdown
   const generateTimeOptions = () => {
@@ -228,17 +252,6 @@ function App() {
   };
 
 
-  // Function to handle color change manually for a course
-  const handleColorChangeManual = (courseId) => {
-    const newColor = prompt('Enter a new color (e.g., #ff0000 or red):');
-    if (newColor) {
-      setCourseColors(prevColors => ({
-        ...prevColors,
-        [courseId]: newColor
-      }));
-    }
-  };
-
   
 // Filter courses in the modal based on the search query and filters (OR condition for days/fields)
 const browseFilteredCourses = courses.filter(course => {
@@ -269,309 +282,199 @@ const browseFilteredCourses = courses.filter(course => {
       {console.log('Active Semester during render:', activeSemester)}
       {console.log('Picked courses during render:', pickedCourses)}
       
-      {/* Dynamically Generate Tabs for Available Semesters */}
-      {availableSemesters.length > 0 && activeSemester && (
-        <Tabs 
-          value={activeSemester} 
-          onChange={handleSemesterChange} 
-          aria-label="Semester Tabs"
-        >
-          {availableSemesters.map(semester => (
-            <Tab key={semester} value={semester} label={`Semester ${semester}`} />
-          ))}
-        </Tabs>
-      )}
+      {/* Grid for the tabs, buttons, and search field */}
+        <Grid container spacing={2} alignItems="center" marginBottom={1}>
+          {/* Dynamically Generate Tabs for Available Semesters */}
+          {availableSemesters.length > 0 && activeSemester && (
+            <Grid item sm="auto">
+              <Tabs 
+                value={activeSemester} 
+                onChange={handleSemesterChange} 
+                aria-label="Semester Tabs"
+              >
+                {availableSemesters.map(semester => (
+                  <Tab key={semester} value={semester} label={`Semester ${semester}`} />
+                ))}
+              </Tabs>
+            </Grid>
+          )}
 
-      {/* header or made by text */}
-      <header style={{ textAlign: 'right', marginTop: '-25px' }}>
-        <Typography variant="body2" color="textSecondary">
-          Created by Itai Madar
-          <br /> Inspired by bid-it
-        </Typography>
-      </header>
-
-      {/* Grid for the schedule and course selection */}
-      {activeSemester && pickedCourses[activeSemester] && (
-        <Grid container spacing={3}>
-          {/* Schedule: Weekly Calendar */}
-          <Grid item xs={12} sm={8} marginTop={2}>
-            <Schedule 
-              pickedCourses={[...(pickedCourses[activeSemester] || []), ...(pickedCourses[0] || [])]} 
-              removeCourse={removeCourse}
-              courseColors={courseColors}
-              handleColorChange={handleColorChange}
-            />
+          {/* Browse Courses Button */}
+          <Grid item sm="auto">
+            <Tooltip title="Browse Courses"
+              slotProps={{
+                popper: {
+                  modifiers: [
+                    {
+                      name: 'offset',
+                      options: {
+                        offset: [0, -14],
+                      },
+                    },
+                  ],
+                },
+              }}>
+              
+              <IconButton
+                onClick={handleBrowseCoursesOpen}
+                style={{color: "#347aeb"}}
+                size='small'
+              >
+                <SearchIcon />
+              </IconButton>
+            </Tooltip>
           </Grid>
 
-          {/* Right Sidebar: Picked Courses */}
-          <Grid item xs={12} sm={4} md ={4} marginTop={2}>
-            {/* Browse Courses Button */}
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleBrowseCoursesOpen}
-              style={{ marginBottom: '10px',
-                       marginTop: '-20px'
-              }}
-            >
-              Browse Courses
-            </Button>
-            
-            <Tooltip title="Clear all picked courses" placement="bottom">
-            <Button
-              variant="contained"
-              color="secondary"
-              onClick={() => {
-                setPickedCourses({ 1: [], 2: [], 3: [] });
-                Cookies.set('pickedCourses', JSON.stringify({ 1: [], 2: [], 3: [] }), { expires: 7 });
-              }}
-              style={{ marginBottom: '10px', marginTop: '-20px', marginLeft: "5px", backgroundColor: '#ff6666' }}
-            >
-              <DeleteIcon />
-            </Button>
+          {/* Clear Picked Courses Button */}
+          <Grid item sm="auto">
+            <Tooltip title="Clear Courses" placement="bottom"
+              slotProps={{
+                popper: {
+                  modifiers: [
+                    {
+                      name: 'offset',
+                      options: {
+                        offset: [0, -14],
+                      },
+                    },
+                  ],
+                },
+              }}>
+              <IconButton
+                variant="contained"
+                size="small"
+                onClick={handleConfirmDialogOpen}
+                style={{color: '#eb5834' }}
+              >
+                <DeleteIcon />
+              </IconButton>
             </Tooltip>
+          </Grid>
 
-            {/* Search Bar */}
+          {/* Quick Course Search Field */}
+          <Grid item xs={10} sm={4} marginTop={-1}>
             <AutocompleteSearch 
               courses={filteredCourses}  // Pass filtered courses to AutocompleteSearch
               addCourse={addCourse}
             />
+          </Grid>
 
-            {/* Picked Courses List */}
-            <PickedCourses 
-              pickedCourses={[...(pickedCourses[activeSemester] || []), ...(pickedCourses[0] || [])]} // Show picked courses for active (and yearly) semester
-              removeCourse={removeCourse}
-              showCourseDetails={handleShowCourseDetails}
-              courseColors={courseColors}
-            />
+          {/* More Options Button */}
+          <Grid item sm="auto" marginBottom={-2} marginLeft={-2}>
+            <Tooltip title="More Options"
+              slotProps={{
+                popper: {
+                  modifiers: [
+                    {
+                      name: 'offset',
+                      options: {
+                        offset: [0, -14],
+                      },
+                    },
+                  ],
+                },
+              }}>
+            <IconButton onClick={handleOptionsDialogOpen}
+                        size='small'
+            >
+              <MoreVertIcon />
+            </IconButton>
+            </Tooltip>
           </Grid>
         </Grid>
-      )}
 
-      {/* Course Browsing Modal */}
-      <Dialog open={isBrowseModalOpen} onClose={handleBrowseCoursesClose} maxWidth="md" fullWidth >
-        <DialogTitle>Browse Courses</DialogTitle>
-        <DialogContent>
-
-          {/* Search Field */}
-          <TextField
-            label="Search by Name or ID"
-            variant="outlined"
-            fullWidth
-            margin="dense"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={hideOverlapping}
-                onChange={(e) => setHideOverlapping(e.target.checked)}
+        {/* Grid for the schedule and course selection */}
+        {activeSemester && pickedCourses[activeSemester] && (
+          <Grid container spacing={3}>
+            {/* Schedule: Weekly Calendar */}
+            <Grid item xs={12} sm={7} md={8} marginTop={2}>
+              <Schedule 
+                pickedCourses={[...(pickedCourses[activeSemester] || []), ...(pickedCourses[0] || [])]} 
+                removeCourse={removeCourse}
+                courseColors={courseColors}
+                handleColorChange={handleColorChange}
               />
-            }
-            label="Hide Overlapping Courses"
+            </Grid>
+
+            {/* Right Sidebar: Picked Courses */}
+            <Grid item xs={12} sm={5} md={4} marginTop={-1.5} sx={{ display: { xs: 'block', sm: 'block' } }}>
+              {/* Picked Courses List */}
+              <PickedCourses 
+                pickedCourses={[...(pickedCourses[activeSemester] || []), ...(pickedCourses[0] || [])]} // Show picked courses for active (and yearly) semester
+                removeCourse={removeCourse}
+                courseColors={courseColors}
+              />
+            </Grid>
+          </Grid>
+        )}
+
+        {/* Course Browsing Modal */}
+        <BrowseModal
+          isBrowseModalOpen={isBrowseModalOpen}
+          handleBrowseCoursesClose={handleBrowseCoursesClose}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          hideOverlapping={hideOverlapping}
+          setHideOverlapping={setHideOverlapping}
+          showFromTimeFilter={showFromTimeFilter}
+          setShowFromTimeFilter={setShowFromTimeFilter}
+          fromTime={fromTime}
+          setFromTime={setFromTime}
+          filterSemester={filterSemester}
+          setFilterSemester={setFilterSemester}
+          selectedDays={selectedDays}
+          handleDaysChange={handleDaysChange}
+          selectedFields={selectedFields}
+          handleFieldsChange={handleFieldsChange}
+          fieldOfStudyOptions={fieldOfStudyOptions}
+          generateTimeOptions={generateTimeOptions}
+          browseFilteredCourses={browseFilteredCourses}
+          pickedCourses={pickedCourses}
+          addCourse={addCourse}
+          removeCourse={removeCourse}
+      />
+
+      {/* Options Dialog */}
+      <Dialog open={isOptionsDialogOpen} onClose={handleOptionsDialogClose}>
+        <DialogTitle>Export and Import Options</DialogTitle>
+        <DialogContent>
+          <Button onClick={exportToPng}>Export to PNG</Button>
+          <Button onClick={exportToPdf}>Export to PDF</Button>
+          <Button onClick={exportToIcs}>Export to ICS</Button>
+          <input
+            accept=".ics"
+            style={{ display: 'none' }}
+            id="load-ics-file"
+            type="file"
+            onChange={loadIcsFile}
           />
-
-          {/* Checkbox to show/hide fromTime filter */}
-          <FormControlLabel
-              control={
-                <Checkbox
-                  checked={showFromTimeFilter}
-                  onChange={(e) => {
-                    setShowFromTimeFilter(e.target.checked);
-                    if (!e.target.checked) {
-                      setFromTime(''); // Reset fromTime when checkbox is unchecked
-                    }
-                  }}
-                />
-              }
-              label="Enable Developer Options"
-            />
-
-          {/* Semester Filter */}
-          <TextField
-            select
-            label="Filter by Semester"
-            variant="outlined"
-            fullWidth
-            margin="dense"
-            value={filterSemester}
-            onChange={(e) => setFilterSemester(e.target.value)}
-          >
-            <MenuItem value="">All Semesters</MenuItem>
-            <MenuItem value={1}>Semester 1</MenuItem>
-            <MenuItem value={2}>Semester 2</MenuItem>
-            <MenuItem value={0}>Yearly \ Summer</MenuItem>
-          </TextField>
-
-          {/* Days Multi-Select Filter */}
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Filter by Days</InputLabel>
-            <Select
-              multiple
-              value={selectedDays}
-              onChange={handleDaysChange}
-              input={<OutlinedInput label="Filter by Days" />}
-              renderValue={(selected) => (
-                <div>
-                  {selected.map((value) => (
-                    <Chip key={value} label={value} />
-                  ))}
-                </div>
-              )}
-            >
-              {validDays.map((day) => (
-                <MenuItem key={day} value={day}>
-                  <Checkbox checked={selectedDays.indexOf(day) > -1} />
-                  {day}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          {/* Field of Study Multi-Select Filter */}
-          <FormControl fullWidth margin="dense">
-            <InputLabel>Filter by Field of Study</InputLabel>
-            <Select
-              multiple
-              value={selectedFields}
-              onChange={handleFieldsChange}
-              input={<OutlinedInput label="Filter by Field of Study" />}
-              renderValue={(selected) => (
-                <div>
-                  {selected.map((value) => (
-                    <Chip key={value} label={value} />
-                  ))}
-                </div>
-              )}
-              MenuProps={{
-                PaperProps: {
-                  style: {
-                    maxHeight: 280, // Set the maximum height for the dropdown menu
-                  },
-                },
-              }}
-            >
-              {fieldOfStudyOptions.map((field) => (
-                <MenuItem key={field} value={field}>
-                  <Checkbox checked={selectedFields.indexOf(field) > -1} />
-                  {field}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-
-          {/* From Time Filter */}
-          {showFromTimeFilter && (
-            <FormControl fullWidth margin="dense">
-              <InputLabel>I don't want to get up before...</InputLabel>
-              <Select
-                value={fromTime}
-                onChange={handleFromTimeChange}
-                input={<OutlinedInput label="I don't want to get up before..." />}
-              >
-                {generateTimeOptions().map((time) => (
-                  <MenuItem key={time} value={time}>
-                    {time}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
-
-          {/* List of Filtered Courses */}
-          <div style={{ minHeight: '200px', maxHeight: '400px', overflowY: 'auto' }}>
-            <List>
-              {browseFilteredCourses.map(course => {
-                const isPicked = pickedCourses[course.semester]?.some(pickedCourse => pickedCourse.id === course.id);
-
-                return (
-                  <ListItem key={course.id} button={true}>
-                    <ListItemText primary={`${course.id} - ${course.title}`} />
-                    {isPicked ? (
-                      <>
-                        <Tooltip title="More information"      
-                        slotProps={{
-                                    popper: {
-                                      modifiers: [
-                                        {
-                                          name: 'offset',
-                                          options: {
-                                            offset: [0, -14],
-                                          },
-                                        },
-                                      ],
-                                    },
-                                  }}
-                        >
-                          <IconButton
-                            edge="end"
-                            aria-label="info"
-                            onClick={() => window.open(course.URL, '_blank')}
-                            sx={{ marginRight: 1 }} // Custom styling for InfoIcon
-                          >
-                            <InfoIcon />
-                          </IconButton>
-                        </Tooltip>
-
-                        <Tooltip title="Remove course"
-                                                slotProps={{
-                                                  popper: {
-                                                    modifiers: [
-                                                      {
-                                                        name: 'offset',
-                                                        options: {
-                                                          offset: [0, -14],
-                                                        },
-                                                      },
-                                                    ],
-                                                  },
-                                                }}
-                        >
-                          <IconButton
-                            edge="end"
-                            aria-label="remove"
-                            onClick={() => removeCourse(course.id, course.semester)}
-
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </>
-                    ) : (
-                      <Tooltip title="Add course"
-                      slotProps={{
-                        popper: {
-                          modifiers: [
-                            {
-                              name: 'offset',
-                              options: {
-                                offset: [0, -14],
-                              },
-                            },
-                          ],
-                        },
-                      }}
-                      > 
-                      <IconButton
-                        edge="end"
-                        aria-label="add"
-                        onClick={() => addCourse(course)}
-
-                      >
-                        <AddIcon />
-                      </IconButton>
-                    </Tooltip>
-                    )}
-                  </ListItem>
-                );
-              })}
-            </List>
-          </div>
+          <label htmlFor="load-ics-file">
+            <Button component="span">Load ICS File</Button>
+          </label>
         </DialogContent>
+        <DialogActions>
+          <Button onClick={handleOptionsDialogClose} color="primary">
+            Close
+          </Button>
+        </DialogActions>
       </Dialog>
+
+      {/* Confirm Dialog */}
+      <Dialog open={isConfirmDialogOpen} onClose={handleConfirmDialogClose}>
+        <DialogTitle>Confirmation</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to clear all courses from the current semester?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleConfirmDialogClose} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmClearCourses} color="warning">
+            Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
+
 
       <header style={{ textAlign: 'center', marginTop: '25px', marginBottom: '25px'}}>
         <Typography variant="body2" color="textPrimary">

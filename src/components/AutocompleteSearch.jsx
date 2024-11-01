@@ -49,7 +49,7 @@ const AutocompleteSearch = ({ courses, addCourse }) => {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', p: 0 }}>
           <Button
             variant="contained"
-            sx={{ flex: 1, height: 30, backgroundColor: filter.includes('sem1') ? 'primary.main' : 'grey.300', borderRadius: 0 }}
+            sx={{ flex: 1, height: 30, backgroundColor: filter.includes('sem1') ? 'primary.main' : 'grey.500', borderRadius: 0 }}
             onMouseDown={(e) => e.preventDefault()} // Prevent onBlur from being triggered
             onClick={() => handleFilterChange('sem1')}
           >
@@ -57,7 +57,7 @@ const AutocompleteSearch = ({ courses, addCourse }) => {
           </Button>
           <Button
             variant="contained"
-            sx={{ flex: 1, height: 30, backgroundColor: filter.includes('sem2') ? 'primary.main' : 'grey.300', borderRadius: 0 }}
+            sx={{ flex: 1, height: 30, backgroundColor: filter.includes('sem2') ? 'primary.main' : 'grey.500', borderRadius: 0 }}
             onMouseDown={(e) => e.preventDefault()} // Prevent onBlur from being triggered
             onClick={() => handleFilterChange('sem2')}
           >
@@ -65,7 +65,7 @@ const AutocompleteSearch = ({ courses, addCourse }) => {
           </Button>
           <Button
             variant="contained"
-            sx={{ flex: 1, height: 30, backgroundColor: filter.includes('other') ? 'primary.main' : 'grey.300', borderRadius: 0 }}
+            sx={{ flex: 1, height: 30, backgroundColor: filter.includes('other') ? 'primary.main' : 'grey.500', borderRadius: 0 }}
             onMouseDown={(e) => e.preventDefault()} // Prevent onBlur from being triggered
             onClick={() => handleFilterChange('other')}
           >
@@ -110,7 +110,21 @@ const AutocompleteSearch = ({ courses, addCourse }) => {
           setOpen(false);
         }
       }}
-      renderInput={(params) => <TextField {...params} label="Quick Course Search" variant="standard" color='tertiary'/>}
+      renderInput={(params) => (
+        <TextField 
+          {...params} 
+          label="Quick Course Search" 
+          variant='standard' 
+          color='tertiary'
+          InputLabelProps={{
+            style: { opacity: 0.5} // Adjust the label position
+          }}
+          InputProps={{
+            ...params.InputProps,
+            style: { opacity: inputValue ? 1 : 0 } // Hide the label when writing
+          }}
+        />
+      )}
       PopperComponent={CustomPopper}
     />
   );

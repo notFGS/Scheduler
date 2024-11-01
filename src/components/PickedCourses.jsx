@@ -5,7 +5,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 
 const PickedCourses = ({ pickedCourses, removeCourse, courseColors }) => {
   return (
-    <div>
+    <div style={{ maxHeight: '826.5px', overflowY: 'auto' }}> {/* Set a maximum height and enable vertical scrolling */}
       <List>
         {pickedCourses.map(course => (
           <ListItem 
@@ -13,7 +13,19 @@ const PickedCourses = ({ pickedCourses, removeCourse, courseColors }) => {
             sx={{ borderLeft: `4px solid ${courseColors[course.id] || '#add8e6f2'}`, borderRadius: '4px', marginBottom: '8px' }}
           >
             <ListItemText primary={`${course.id} - ${course.title}`} />
-            <Tooltip title="More information">
+            <Tooltip title="More information"
+              slotProps={{
+                popper: {
+                  modifiers: [
+                    {
+                      name: 'offset',
+                      options: {
+                        offset: [0, -14],
+                      },
+                    },
+                  ],
+                },
+              }}>
               <IconButton
                 edge="end"
                 aria-label="info"
@@ -23,7 +35,20 @@ const PickedCourses = ({ pickedCourses, removeCourse, courseColors }) => {
                 <InfoIcon />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Remove course">
+
+            <Tooltip title="Remove course"
+              slotProps={{
+                popper: {
+                  modifiers: [
+                    {
+                      name: 'offset',
+                      options: {
+                        offset: [0, -14],
+                      },
+                    },
+                  ],
+                },
+              }}>
               <IconButton
                 edge="end"
                 aria-label="delete"
