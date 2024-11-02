@@ -174,7 +174,8 @@ function App() {
 
   // Open the confirm dialog
   const handleConfirmDialogOpen = () => {
-    if (pickedCourses[activeSemester].length === 0) {
+    if (pickedCourses[activeSemester].length === 0 && 
+        pickedCourses[0].length === 0) {
       return;
     }
     setIsConfirmDialogOpen(true);
