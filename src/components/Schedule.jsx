@@ -1,5 +1,6 @@
 import React from 'react';
 import './Schedule.css';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 // Helper function to format time in HH:MM format
 const formatTime = (time) => {
@@ -62,7 +63,7 @@ const groupOverlappingTimeslots = (courses) => {
 };
 
 // Main Schedule component
-const Schedule = ({ pickedCourses, courseColors, handleColorChange }) => {
+const Schedule = ({ pickedCourses, courseColors, handleColorChange, removeCourse}) => {
   const groupedTimeslots = groupOverlappingTimeslots(pickedCourses);
   
   return (
@@ -105,6 +106,27 @@ const Schedule = ({ pickedCourses, courseColors, handleColorChange }) => {
                   <div className="course-title">{timeslot.course.title}</div>
                   <div className="course-time">{`${formatTime(timeslot.fromTime)} - ${formatTime(timeslot.toTime)}`}</div>
                   <div className="course-location">{timeslot.location}</div>
+
+                  { 'ontouchstart' in window && (
+                    <div
+                      className="delete-icon"
+                      onTouchStart={(e) => {
+                        e.preventDefault();
+                        const timeout = setTimeout(() => {
+                          if (window.confirm('Do you want to remove this course?')) {
+                            removeCourse(timeslot.course);
+                          }
+                        }, 500); // Long press duration (500ms)
+
+                        e.target.addEventListener('touchend', () => clearTimeout(timeout), { once: true });
+                        e.target.addEventListener('touchmove', () => clearTimeout(timeout), { once: true });
+                      }}
+                    >
+                      <DeleteIcon />
+                    </div>
+                  )}
+
+
                 </div>
               </React.Fragment>
             );

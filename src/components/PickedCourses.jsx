@@ -52,7 +52,7 @@ const PickedCourses = ({ pickedCourses, removeCourse, courseColors }) => {
               <IconButton
                 edge="end"
                 aria-label="delete"
-                onClick={() => removeCourse(course.id, course.semester)}
+                onClick={() => removeCourse(course)}
                 // sx={{ color: 'red' }} // Custom styling for DeleteIcon
               >
                 <DeleteIcon />

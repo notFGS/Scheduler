@@ -11,16 +11,30 @@ import BrowseModal from './components/BrowseModal';
 import IconButton from '@mui/material/IconButton';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import SearchIcon from '@mui/icons-material/Search';
-import { exportToPng, exportToPdf, exportToIcs, loadIcsFile } from './utils/exportUtils';
+import exportPNG from './utils/exportPNG';
+import exportPDF from './utils/exportPDF';
+import {exportToICS} from './utils/icsUtils';
+import {exportToIcs, loadIcsFile } from './utils/exportUtils';
 
 function App() {
   const [courses, setCourses] = useState([]);   // All available courses
+  const [availableSemesters] = useState([1, 2]); // Initialize with Semester 1 and 2
+
   const [pickedCourses, setPickedCourses] = useState(() => {
     const savedPickedCourses = Cookies.get('pickedCourses');
     return savedPickedCourses ? JSON.parse(savedPickedCourses) : { 1: [], 2: [], 0: [] };
   });
-  const [availableSemesters] = useState([1, 2]); // Initialize with Semester 1 and 2
-  const [activeSemester, setActiveSemester] = useState(1); // Default to Semester 1
+
+  const [courseColors, setCourseColors] = useState(() => {
+    const savedCourseColors = Cookies.get('courseColors');
+    return savedCourseColors ? JSON.parse(savedCourseColors) : {};
+  });
+
+  const [activeSemester, setActiveSemester] = useState(() => {
+    const savedActiveSemester = Cookies.get('activeSemester');
+    return savedActiveSemester ? parseInt(savedActiveSemester) : 1;
+  });
+
   const [isBrowseModalOpen, setIsBrowseModalOpen] = useState(false);  // State to control course browsing modal
   const [isOptionsDialogOpen, setIsOptionsDialogOpen] = useState(false);  // State to control options dialog
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);  // State to control confirm dialog
@@ -32,7 +46,7 @@ function App() {
   const [hideOverlapping, setHideOverlapping] = useState(false); // State to control hiding of overlapping courses
   const [showFromTimeFilter, setShowFromTimeFilter] = useState(false); // State to control visibility of fromTime filter
   const [fromTime, setFromTime] = useState('') // State to manage fromTime filter
-  const [courseColors, setCourseColors] = useState({}); // State to manage course colors
+
 
   const validDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
   const timeFormatRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -120,26 +134,34 @@ function App() {
   };
 
   // Remove course from the correct semester
-  const removeCourse = (courseId, semester) => {
+  const removeCourse = (course) => {
     setPickedCourses(prevState => {
       // Ensure the semester exists before modifying the state
-      if (!prevState[semester]) {
-        console.error(`Semester ${semester} is not defined in pickedCourses.`);
+      if (!prevState[course.semester]) {
+        console.error(`Semester ${course.semester} is not defined in pickedCourses.`);
         return prevState; // Return the state unchanged if the semester doesn't exist
       }
   
       // Update the state by removing the course
-      const updatedSemesterCourses = prevState[semester].filter(course => course.id !== courseId);
+      const updatedSemesterCourses = prevState[course.semester].filter(pickedCourse => pickedCourse.id !== course.id);
       
       const updatedPickedCourses = {
         ...prevState,
-        [semester]: updatedSemesterCourses,
+        [course.semester]: updatedSemesterCourses,
       };
-
       Cookies.set('pickedCourses', JSON.stringify(updatedPickedCourses), { expires: 7 });
 
       return updatedPickedCourses;
     });
+
+    setCourseColors(prevColors => {
+      const updatedColors = { ...prevColors };
+      delete updatedColors[course.id]; // Remove the color associated with the course
+      Cookies.set('courseColors', JSON.stringify(updatedColors), { expires: 7 }); // Save to cookies
+      return updatedColors;
+    }
+    );
+    
   
     console.log('Course removed, updated pickedCourses:', pickedCourses);
   };
@@ -149,7 +171,7 @@ function App() {
   // Handle tab change (semester change)
   const handleSemesterChange = (event, newValue) => {
     setActiveSemester(newValue);
-    console.log('Active semester changed to:', newValue);  // Debug log
+    Cookies.set('activeSemester', newValue, { expires: 7 });
   };
 
   // Open the browse courses modal
@@ -247,10 +269,15 @@ function App() {
   // Function to handle color change for a course
   const handleColorChange = (courseId) => {
     setCourseColors(prevColors => {
-      const newColor = `#${Math.floor(Math.random()*16777215).toString(16)}`; // Generate a random color
-      return { ...prevColors, [courseId]: newColor };
+      const newColor = `#${Math.floor(Math.random() * 16777215).toString(16)}`; // Generate a random color
+      const updatedColors = { ...prevColors, [courseId]: newColor };
+      
+      Cookies.set('courseColors', JSON.stringify(updatedColors), { expires: 7 }); // Save to cookies
+      
+      return updatedColors;
     });
   };
+
 
 
   
@@ -388,7 +415,7 @@ const browseFilteredCourses = courses.filter(course => {
         {activeSemester && pickedCourses[activeSemester] && (
           <Grid container spacing={3}>
             {/* Schedule: Weekly Calendar */}
-            <Grid item xs={12} sm={7} md={8} marginTop={2}>
+            <Grid item xs={12} sm={7} md={8} marginTop={2} id="schedule-grid">
               <Schedule 
                 pickedCourses={[...(pickedCourses[activeSemester] || []), ...(pickedCourses[0] || [])]} 
                 removeCourse={removeCourse}
@@ -439,9 +466,9 @@ const browseFilteredCourses = courses.filter(course => {
       <Dialog open={isOptionsDialogOpen} onClose={handleOptionsDialogClose}>
         <DialogTitle>Export and Import Options</DialogTitle>
         <DialogContent>
-          <Button onClick={exportToPng}>Export to PNG</Button>
-          <Button onClick={exportToPdf}>Export to PDF</Button>
-          <Button onClick={exportToIcs}>Export to ICS</Button>
+          <Button onClick={exportPNG}>Export to PNG</Button>
+          <Button onClick={exportPDF}>Export to PDF</Button>
+          <Button onClick={exportToICS(pickedCourses[activeSemester], String(activeSemester) + '_Schedule.ics')}>Export to ICS</Button>
           <input
             accept=".ics"
             style={{ display: 'none' }}

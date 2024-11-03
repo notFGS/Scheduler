@@ -1,60 +1,39 @@
-export function createICSEvent(course) {
-    const icsEvent = `
-  BEGIN:VEVENT
-  SUMMARY:${course.title}
-  DTSTART:${formatDate(course.startDate)}
-  DTEND:${formatDate(course.endDate)}
-  LOCATION:${course.location}
-  DESCRIPTION:Course for ${course.field}
-  END:VEVENT
-    `;
-  
-    return icsEvent;
-  }
-  
-  function formatDate(timestamp) {
-    const date = new Date(timestamp);
-    // Format the date in the format required by ICS (YYYYMMDDTHHMMSSZ)
-    return date.toISOString().replace(/-|:|\.\d\d\d/g, '');
-  }
-  
-export function generateICS(pickedCourses) {
-let icsContent = `
-BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Your App//Course Schedule//EN
-`;
+const ics = require('ics');
+const { saveAs } = require('file-saver');
 
-pickedCourses.forEach(course => {
-    icsContent += createICSEvent(course);
-});
+function exportToICS(courses, fileName) {
+  const events = courses.flatMap(course => {
+    return course.schedule.map(scheduleItem => {
+      const [startHour, startMinute] = scheduleItem.fromTime.split(':').map(Number);
+      const [endHour, endMinute] = scheduleItem.toTime.split(':').map(Number);
+      const startDate = new Date(course.startDate);
+      const endDate = new Date(course.endDate);
+      const startYear = startDate.getFullYear();
+      const startMonth = startDate.getMonth() + 1; // Months are zero-based
+      const startDay = startDate.getDate();
+      const endYear = endDate.getFullYear();
+      const endMonth = endDate.getMonth() + 1;
+      const endDay = endDate.getDate();
 
-icsContent += `
-END:VCALENDAR
-`;
-
-return icsContent;
-}
-
-export function parseICS(icsContent) {
-  const events = [];
-  const eventRegex = /BEGIN:VEVENT([\s\S]*?)END:VEVENT/g;
-  let match;
-
-  while ((match = eventRegex.exec(icsContent)) !== null) {
-    const eventText = match[1];
-    const event = {};
-
-    eventText.split('\n').forEach(line => {
-      const [key, value] = line.split(':');
-      if (key && value) {
-        event[key.trim()] = value.trim();
-      }
+      return {
+        title: course.name,
+        start: [startYear, startMonth, startDay, startHour, startMinute],
+        end: [startYear, startMonth, startDay, endHour, endMinute],
+        recurrenceRule: `FREQ=WEEKLY;BYDAY=${scheduleItem.day};UNTIL=${endYear}${endMonth}${endDay}T235959Z`
+      };
     });
+  });
 
-    events.push(event);
-  }
-
-  return events;
+  ics.createEvents(events, (error, value) => {
+    if (error) {
+      console.error(error);
+      return;
+    }
+    const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
+    saveAs(blob, fileName);
+  });
 }
-  
+
+module.exports = {
+  exportToICS
+};

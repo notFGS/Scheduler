@@ -20,3 +20,5 @@ const exportPDF = () => {
 };
 
 export default exportPDF;
+
+// TODO: reimplement to compile as vector graphics

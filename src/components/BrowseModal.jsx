@@ -223,7 +223,7 @@ const BrowseModal = ({
                         <IconButton
                           edge="end"
                           aria-label="remove"
-                          onClick={() => removeCourse(course.id, course.semester)}
+                          onClick={() => removeCourse(course)}
                         >
                           <DeleteIcon />
                         </IconButton>
